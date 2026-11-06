@@ -28,7 +28,9 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%}
+/* Geen zoom bij dubbeltik (snel op + en − tikken); knijpen om te zoomen blijft werken */
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
+button,label,input,.tab,.switch{touch-action:manipulation}
 body{margin:0;background:var(--achtergrond);color:var(--tekst);font:16px/1.4 Arial,sans-serif;-webkit-tap-highlight-color:transparent;font-variant-numeric:tabular-nums}
 .wrap{max-width:440px;margin:0 auto;display:grid;gap:16px;
   padding-top:calc(14px + env(safe-area-inset-top,0px));
@@ -492,6 +494,18 @@ function parseReceipt(text){
 }
 
 renderPeople();renderLines();renderSplit();renderResult();
+
+/*
+ * Geen zoom bij snel dubbeltikken op een knop (vooral iPhone).
+ * Komt een tweede tik binnen 350 ms, dan blokkeren we de zoom
+ * en voeren we de klik zelf uit, zodat elke tik telt.
+ */
+let laatsteTik=0;
+document.addEventListener("touchend",e=>{
+  const nu=Date.now(),knop=e.target.closest("button,label.btn");
+  if(knop&&nu-laatsteTik<350){e.preventDefault();if(!knop.disabled)knop.click()}
+  laatsteTik=nu;
+},{passive:false});
 
 /*
  * ============================================================
