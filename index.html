@@ -493,10 +493,74 @@ function parseReceipt(text){
 
 renderPeople();renderLines();renderSplit();renderResult();
 
-/* Service worker: de app opent ook zonder internet (de tekstherkenning heeft wel internet nodig) */
-if("serviceWorker" in navigator&&location.protocol==="https:"){
-  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+/*
+ * ============================================================
+ * SERVICE WORKER EN NIEUWE VERSIES (zelfde aanpak als De Leste)
+ * - De app opent ook zonder internet (tekstherkenning heeft wel internet nodig).
+ * - Wordt er een nieuwe service worker actief, dan herlaadt de app één keer.
+ * - Een iPhone (en soms Android) start de app niet opnieuw op als je vanuit
+ *   een andere app terugkeert. Daarom kijken we bij elke terugkeer zelf of er
+ *   op GitHub een nieuwe versie staat, en herladen we dan.
+ * Namen en rekening staan in localStorage; het gekozen tabblad en de
+ * scrollpositie onthouden we hier, zodat je op dezelfde plek terugkomt.
+ * ============================================================
+ */
+const SCHERM_SLEUTEL="splitbill-scherm";
+let isAlHerladen=false;
+function herlaadNaarNieuweVersie(){
+  if(isAlHerladen)return;
+  isAlHerladen=true;
+  try{sessionStorage.setItem(SCHERM_SLEUTEL,JSON.stringify({cur,scrollY:window.scrollY}))}catch(e){}
+  window.location.reload();
 }
+function herstelScherm(){
+  try{
+    const t=sessionStorage.getItem(SCHERM_SLEUTEL);sessionStorage.removeItem(SCHERM_SLEUTEL);
+    if(!t)return;
+    const sc=JSON.parse(t);
+    if(sc.cur&&S.people.some(p=>p.id===sc.cur)){cur=sc.cur;renderSplit()}
+    if(typeof sc.scrollY==="number")window.scrollTo(0,sc.scrollY);
+  }catch(e){}
+}
+herstelScherm();
+
+if("serviceWorker" in navigator){
+  const hadAlServiceWorker=Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadAlServiceWorker)herlaadNaarNieuweVersie()});
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})});
+}
+
+const TE_CONTROLEREN=["index.html"];
+const MINIMALE_TUSSENTIJD=30*1000; /* niet vaker dan eens per 30 seconden */
+let huidigeVersie=null,laatsteControle=0;
+async function leesVersie(bron){
+  try{
+    const teksten=await Promise.all(TE_CONTROLEREN.map(async b=>{
+      const a=bron==="cache"?await caches.match(b,{ignoreSearch:true}):await fetch(b,{cache:"no-store"});
+      if(!a||!a.ok)throw new Error("niet gevonden");
+      return a.text();
+    }));
+    return teksten.join("\n");
+  }catch(e){return null}
+}
+async function onthoudHuidigeVersie(){
+  huidigeVersie=await leesVersie("netwerk");
+  if(huidigeVersie===null&&"caches" in window)huidigeVersie=await leesVersie("cache");
+  laatsteControle=Date.now();
+}
+async function zoekNieuweVersie(){
+  if(Date.now()-laatsteControle<MINIMALE_TUSSENTIJD)return;
+  laatsteControle=Date.now();
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.getRegistration().then(r=>r&&r.update()).catch(()=>{});
+  }
+  const nieuwste=await leesVersie("netwerk");
+  if(nieuwste===null)return; /* geen internet: verder met wat er staat */
+  if(huidigeVersie===null){huidigeVersie=nieuwste;return}
+  if(nieuwste!==huidigeVersie)herlaadNaarNieuweVersie();
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")zoekNieuweVersie()});
+if(location.protocol.startsWith("http"))onthoudHuidigeVersie();
 </script>
 </body>
 </html>
