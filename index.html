@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f3ee">
+<meta name="color-scheme" content="light">
+<title>SplitBill</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SplitBill">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+/*
+ * Thema overgenomen van de bestelapp (De Leste):
+ * warm gebroken wit, witte kaarten met zachte schaduw, goudgeel accent.
+ * Altijd de lichte versie, ook als de gsm in donkere modus staat.
+ */
+:root{
+  --achtergrond:#f6f3ee; --kaart:#ffffff; --tekst:#1f1a12; --tekst-zacht:#9a9286; --lijn:#ebe5da;
+  --accent:#f6b51e; --accent-sterk:#a86b00; --op-accent:#3a2600; --besteld:#fff3d1;
+  --gevaar:#c62828; --goed:#2e7d32;
+  --schaduw:0 1px 3px rgba(60,40,0,.08),0 4px 12px rgba(60,40,0,.06);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--achtergrond);color:var(--tekst);font:16px/1.4 Arial,sans-serif;-webkit-tap-highlight-color:transparent;font-variant-numeric:tabular-nums}
+.wrap{max-width:440px;margin:0 auto;display:grid;gap:16px;
+  padding-top:calc(14px + env(safe-area-inset-top,0px));
+  padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:26px;margin:0;line-height:1.15}
+h2{font-size:22px;margin:0}
+.sub{color:var(--tekst-zacht);margin:4px 0 0;font-size:15px}
+.card{background:var(--kaart);border-radius:14px;box-shadow:var(--schaduw);padding:16px;display:grid;gap:12px;min-width:0}
+.hint{font-size:15px;color:var(--tekst-zacht);margin:0}
+.warn{color:var(--gevaar)} .ok{color:var(--goed)}
+input{font:17px Arial,sans-serif;color:var(--tekst);background:var(--achtergrond);border:2px solid var(--lijn);border-radius:10px;padding:9px 10px;min-width:0;width:100%}
+input:focus{outline:none;border-color:var(--accent)}
+button{font-family:inherit;color:inherit;border:none;border-radius:10px;cursor:pointer;min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:active,label.btn:active{filter:brightness(.88)}
+button:focus-visible,label.btn:focus-within{outline:3px solid var(--accent-sterk);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;font:bold 18px Arial,sans-serif;padding:0 16px;border-radius:10px;border:none;background:var(--accent);color:var(--op-accent);cursor:pointer;box-shadow:var(--schaduw)}
+.btn.ghost{background:var(--kaart);color:var(--tekst);font-size:16px}
+.btn:disabled{opacity:.5}
+.btn svg{width:22px;height:22px;flex:none}
+#resetBtn{background:transparent;color:var(--gevaar);box-shadow:inset 0 0 0 2px var(--gevaar)}
+.row2{display:grid;grid-template-columns:1fr auto;gap:8px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* namen */
+.people{display:flex;flex-wrap:wrap;gap:8px}
+.person{display:inline-flex;align-items:center;background:var(--besteld);border-radius:10px;padding-left:12px;font-weight:bold;font-size:18px}
+.person button{background:transparent;width:40px;min-width:40px;height:40px;min-height:40px;font-size:22px;color:var(--accent-sterk)}
+
+/* foto */
+.photo{display:grid;gap:10px}
+.photo canvas{width:100%;height:auto;max-height:60vh;object-fit:contain;border-radius:10px;background:var(--achtergrond)}
+.tools{display:grid;grid-template-columns:auto auto 1fr;gap:8px}
+.tools .btn.ghost{padding:0 14px;font-size:22px}
+.status{font-size:14px;color:var(--tekst-zacht);margin:0;min-height:1.2em}
+.bar-progress{height:6px;background:var(--lijn);border-radius:6px;overflow:hidden}
+.bar-progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+
+/* lijnen bewerken */
+.lines{display:grid}
+.eline{display:grid;grid-template-columns:52px 1fr 84px;gap:6px;padding-block:10px;border-top:1px solid var(--lijn)}
+.eline:first-child{border-top:0;padding-top:0}
+.eline input{padding:8px}
+.eline .q,.eline .p{text-align:right;font-weight:bold}
+.eline .sub2{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.seg{display:inline-flex;background:var(--lijn);border-radius:12px;padding:3px}
+.seg button{min-height:36px;background:transparent;padding:0 12px;font-size:14px;font-weight:bold;color:var(--tekst-zacht);border-radius:9px}
+.seg button[aria-pressed="true"]{background:var(--kaart);color:var(--tekst);box-shadow:var(--schaduw)}
+.del{background:transparent;color:var(--gevaar);font-size:15px;font-weight:bold;padding:0 6px}
+.sumline{display:flex;justify-content:space-between;font-weight:bold;font-size:18px;padding-top:10px;border-top:2px solid var(--tekst)}
+.sumline span:last-child{color:var(--accent-sterk)}
+
+/* wie had wat */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;display:inline-flex;flex-direction:column;align-items:flex-start;font-weight:bold;font-size:17px;padding:6px 14px;border-radius:10px;background:var(--lijn);color:var(--tekst)}
+.tab small{font-size:13px;color:var(--tekst-zacht);font-weight:bold}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--op-accent);box-shadow:var(--schaduw)}
+.tab[aria-selected="true"] small{color:var(--op-accent)}
+.who{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.who span{font-weight:bold;font-size:22px}
+.who b{font-size:28px;color:var(--accent-sterk)}
+.pline{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;min-height:56px;margin:4px -8px;padding:4px 8px;border-radius:10px;transition:background-color .15s}
+.pline.has{background:var(--besteld)}
+.pline.has .pn{font-weight:bold}
+.pn{min-width:0;overflow-wrap:anywhere;font-size:19px;line-height:1.2}
+.pm{font-size:13px;color:var(--tekst-zacht);font-weight:normal}
+.pm.full{color:var(--gevaar)}
+.step{display:flex;align-items:center;gap:8px}
+.step button{width:44px;min-width:44px;height:44px;padding:0;font-size:26px;line-height:1}
+.step button[data-a="inc"]{background:var(--accent);color:var(--op-accent)}
+.step button[data-a="dec"]{background:transparent;color:var(--accent-sterk);box-shadow:inset 0 0 0 2px var(--accent-sterk)}
+.step button:disabled{opacity:.3}
+.step output{width:30px;text-align:center;font-weight:bold;font-size:22px;color:var(--tekst-zacht)}
+.pline.has output{color:var(--accent-sterk)}
+.switch{display:inline-flex;align-items:center;gap:10px;background:transparent;font-weight:bold;font-size:15px;padding:0}
+.switch i{position:relative;width:50px;height:30px;border-radius:999px;background:var(--lijn);transition:background .15s;flex:none}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--kaart);box-shadow:var(--schaduw);transition:transform .15s}
+.switch[aria-checked="true"] i{background:var(--accent)}
+.switch[aria-checked="true"] i::after{transform:translateX(20px)}
+
+/* overzicht (zoals de bon in de bestelapp) */
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:10px;border-bottom:1px solid var(--lijn);font-size:19px}
+.rrow b{font-size:22px;white-space:nowrap}
+.rrow small{display:block;color:var(--tekst-zacht);font-size:13px;overflow-wrap:anywhere}
+.rrow.open{color:var(--gevaar)}
+.rrow:last-child{border-bottom:none;border-top:2px solid var(--tekst);margin-top:-1px;font-weight:bold}
+.rrow:last-child b{color:var(--accent-sterk);font-size:26px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{color:var(--tekst-zacht);font-style:italic;margin:4px 0}
+
+/* vaste balk onderaan */
+.footer{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--achtergrond);box-shadow:0 -1px 3px rgba(60,40,0,.08),0 -4px 12px rgba(60,40,0,.06);
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.footer div{max-width:440px;margin:0 auto;display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:bold;font-size:20px}
+.footer .lbl{font-size:18px}
+@media (hover:hover){button:hover,label.btn:hover{filter:brightness(.94)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>SplitBill</h1>
+    <p class="sub">Namen invullen, foto van de rekening, tellen wie wat had.</p>
+  </header>
+
+  <!-- 1. Namen -->
+  <section class="card" aria-labelledby="h-names">
+    <h2 id="h-names">Wie zit er aan tafel</h2>
+    <div id="personForm" class="row2">
+      <label for="personInput" class="vh">Naam</label>
+      <input id="personInput" placeholder="Naam (of: Luc, Nick, Jo)" enterkeyhint="done" autocomplete="off" autocapitalize="words">
+      <button class="btn" id="addPerson" type="button">Voeg toe</button>
+    </div>
+    <div class="people" id="people"></div>
+  </section>
+
+  <!-- 2. Rekening -->
+  <section class="card" aria-labelledby="h-bill">
+    <h2 id="h-bill">Rekening</h2>
+    <label class="btn" for="photoInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      Foto kiezen of nemen
+    </label>
+    <input id="photoInput" class="vh" type="file" accept="image/*">
+    <p class="status" id="photoMsg" hidden></p>
+    <div class="photo" id="photoBox" hidden>
+      <canvas id="preview" aria-label="Foto van de rekening"></canvas>
+      <div class="tools">
+        <button class="btn ghost" id="rotL" type="button" aria-label="Draai naar links">↺</button>
+        <button class="btn ghost" id="rotR" type="button" aria-label="Draai naar rechts">↻</button>
+        <button class="btn" id="ocrBtn" type="button">Lees rekening</button>
+      </div>
+      <div class="bar-progress" id="prog" hidden><i id="progBar"></i></div>
+      <p class="status" id="ocrStatus">Draai de foto tot de tekst rechtop staat en tik op Lees rekening.</p>
+    </div>
+    <div class="lines" id="lines"></div>
+    <div class="sumline" id="sumLine" hidden><span>Som lijnen</span><span id="sumVal"></span></div>
+    <p class="hint" id="billCheck" hidden></p>
+    <button class="btn ghost" id="addLine" type="button">+ Lijn toevoegen</button>
+  </section>
+
+  <!-- 3. Wie had wat -->
+  <section class="card" aria-labelledby="h-split">
+    <h2 id="h-split">Wie had wat</h2>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Personen"></div>
+    <div id="panel" role="tabpanel"></div>
+  </section>
+
+  <!-- 4. Overzicht -->
+  <section class="card result" aria-labelledby="h-sum" aria-live="polite">
+    <h2 id="h-sum">Per persoon</h2>
+    <div id="result"></div>
+    <div class="actions">
+      <button class="btn" id="shareBtn" type="button">Deel overzicht</button>
+      <button class="btn ghost" id="resetBtn" type="button">Nieuwe rekening</button>
+    </div>
+  </section>
+</main>
+
+<div class="footer" aria-live="polite"><div><span class="lbl" id="fLbl">Nog toe te wijzen</span><span id="fVal">€ 0,00</span></div></div>
+
+<script>
+"use strict";
+const KEY="rekening-splitsen-gh-v1";
+const TESS="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+const FOOD=/portie|kaas|hesp|bitterbal|nacho|friet|chips|snack|hapje|plank|olijf|toast|croque|soep|salade|pizza|burger|tapas|garna|kroket|loempia|gemengd|brood|dessert|ijs\b|taart|wafel|pannenkoek|frit|kip|vlees|vis\b|pasta|spaghetti|lasagne|kaart|menu|mosselen|steak/i;
+
+const $=id=>document.getElementById(id);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const num=v=>{const x=parseFloat(String(v).replace(/\s|€/g,"").replace(",","."));return isFinite(x)?x:0};
+const eur=x=>"€ "+(Math.round(x*100)/100).toFixed(2).replace(".",",");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const guessKind=n=>FOOD.test(n)?"deel":"drank";
+
+let S=null, cur=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!Array.isArray(S.people)||!Array.isArray(S.items))S={people:[],items:[],billTotal:null};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const newItem=(n="",q=1,p=0,kind)=>({id:uid(),n,q,p,kind:kind||guessKind(n),c:{},out:[]});
+const qty=it=>Math.max(1,parseInt(it.q,10)||1);
+const used=it=>S.people.reduce((a,p)=>a+(it.c[p.id]||0),0);
+
+/* ---------- berekening: niet toegewezen bedrag wordt NIET verdeeld ---------- */
+function compute(){
+  const t={},parts={};S.people.forEach(p=>{t[p.id]=0;parts[p.id]=[]});
+  let open=0,total=0;
+  S.items.forEach(it=>{
+    const p=num(it.p),q=qty(it);total+=p;
+    if(it.kind==="drank"){
+      const unit=p/q;let u=0;
+      S.people.forEach(pp=>{const c=it.c[pp.id]||0;if(c){t[pp.id]+=c*unit;parts[pp.id].push(`${c}× ${it.n||"?"}`);u+=c}});
+      open+=Math.max(0,q-u)*unit;
+    }else{
+      const sh=S.people.filter(pp=>!it.out.includes(pp.id));
+      if(!sh.length)open+=p;
+      else sh.forEach(pp=>{t[pp.id]+=p/sh.length;parts[pp.id].push(`${it.n||"?"} (1/${sh.length})`)});
+    }
+  });
+  return {t,parts,open,total};
+}
+
+/* ---------- namen ---------- */
+function renderPeople(){
+  $("people").innerHTML=S.people.length?S.people.map(p=>`<span class="person">${esc(p.name)}<button type="button" data-del="${p.id}" aria-label="Verwijder ${esc(p.name)}">×</button></span>`).join(""):`<p class="empty">Nog niemand. Voeg de namen toe.</p>`;
+}
+function addPeople(){
+  const names=$("personInput").value.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+  if(!names.length)return;
+  names.forEach(n=>S.people.push({id:uid(),name:n}));
+  $("personInput").value="";
+  if(!cur)cur=S.people[0].id;
+  save();renderPeople();renderSplit();renderResult();
+}
+$("addPerson").addEventListener("click",addPeople);
+$("personInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addPeople()}});
+$("people").addEventListener("click",e=>{
+  const b=e.target.closest("[data-del]");if(!b)return;
+  const id=b.dataset.del;
+  S.people=S.people.filter(p=>p.id!==id);
+  S.items.forEach(it=>{delete it.c[id];it.out=it.out.filter(x=>x!==id)});
+  if(cur===id)cur=S.people[0]?S.people[0].id:null;
+  save();renderPeople();renderSplit();renderResult();
+});
+
+/* ---------- lijnen bewerken ---------- */
+function renderLines(){
+  $("lines").innerHTML=S.items.length?S.items.map(it=>`<div class="eline" data-id="${it.id}">
+    <input class="q" data-f="q" inputmode="numeric" value="${esc(it.q)}" aria-label="Aantal">
+    <input data-f="n" value="${esc(it.n)}" placeholder="Omschrijving" aria-label="Omschrijving">
+    <input class="p" data-f="p" inputmode="decimal" value="${it.p?num(it.p).toFixed(2).replace(".",","):""}" placeholder="0,00" aria-label="Totaalprijs van de lijn">
+    <div class="sub2">
+      <div class="seg" role="group" aria-label="Soort"><button type="button" data-k="drank" aria-pressed="${it.kind==="drank"}">Drank</button><button type="button" data-k="deel" aria-pressed="${it.kind==="deel"}">Eten / delen</button></div>
+      <button type="button" class="del" data-rm="1">Verwijder</button>
+    </div></div>`).join(""):`<p class="empty">Neem een foto van de rekening of voeg de lijnen zelf toe. De prijs is het totaal van de lijn.</p>`;
+  renderSum();
+}
+function renderSum(){
+  const total=S.items.reduce((a,i)=>a+num(i.p),0);
+  $("sumLine").hidden=!S.items.length;$("sumVal").textContent=eur(total);
+  const c=$("billCheck");
+  if(S.billTotal&&S.items.length){
+    c.hidden=false;
+    const ok=Math.abs(total-S.billTotal)<0.005;
+    c.className="hint "+(ok?"ok":"warn");
+    c.textContent=ok?`Klopt met het totaal op de rekening (${eur(S.billTotal)}).`:`Op de rekening staat ${eur(S.billTotal)}. Controleer de lijnen.`;
+  }else c.hidden=true;
+}
+const findItem=el=>S.items.find(i=>i.id===el.closest(".eline").dataset.id);
+$("lines").addEventListener("input",e=>{
+  const f=e.target.dataset.f;if(!f)return;const it=findItem(e.target);
+  if(f==="n")it.n=e.target.value;
+  if(f==="p")it.p=num(e.target.value);
+  if(f==="q")it.q=e.target.value;
+  save();renderSum();renderSplit();renderResult();
+});
+$("lines").addEventListener("change",e=>{
+  const f=e.target.dataset.f,it=findItem(e.target);
+  if(f==="n"&&it.auto){it.auto=false;it.kind=guessKind(it.n);save();renderLines();renderSplit();renderResult();return}
+  if(f!=="q")return;
+  it.q=qty(it);e.target.value=it.q;
+  let over=used(it)-it.q;
+  for(let i=S.people.length-1;i>=0&&over>0;i--){const id=S.people[i].id;while((it.c[id]||0)>0&&over>0){it.c[id]--;over--}}
+  save();renderSplit();renderResult();
+});
+$("lines").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;const it=findItem(b);
+  if(b.dataset.k){it.kind=b.dataset.k}
+  if(b.dataset.rm){S.items=S.items.filter(x=>x!==it)}
+  save();renderLines();renderSplit();renderResult();
+});
+$("addLine").onclick=()=>{
+  S.items.push(Object.assign(newItem(),{auto:true}));save();renderLines();renderSplit();renderResult();
+  const rows=$("lines").querySelectorAll(".eline");rows[rows.length-1].querySelector('[data-f="n"]').focus();
+};
+
+/* ---------- wie had wat (per persoon een lijst) ---------- */
+function renderSplit(){
+  const {t,open}=compute();
+  if(!S.people.length){$("tabs").innerHTML="";$("panel").innerHTML=`<p class="empty">Vul eerst de namen in.</p>`;return}
+  if(!cur||!S.people.some(p=>p.id===cur))cur=S.people[0].id;
+  $("tabs").innerHTML=S.people.map(p=>`<button type="button" class="tab" role="tab" id="tab-${p.id}" data-p="${p.id}" aria-selected="${p.id===cur}">${esc(p.name)}<small>${eur(t[p.id])}</small></button>`).join("");
+  if(!S.items.length){$("panel").innerHTML=`<p class="empty">Nog geen lijnen op de rekening.</p>`;return}
+  const me=S.people.find(p=>p.id===cur);
+  const rows=S.items.map(it=>{
+    const p=num(it.p),q=qty(it);
+    if(it.kind==="drank"){
+      const mine=it.c[cur]||0,left=q-used(it);
+      return `<div class="pline${mine?" has":""}"><div class="pn">${esc(it.n||"?")}<div class="pm${left?"":" full"}">${eur(p/q)} · ${left?`nog ${left} van ${q} over`:`alle ${q} verdeeld`}</div></div>
+      <div class="step"><button type="button" data-a="dec" data-i="${it.id}" aria-label="Eén minder"${mine?"":" disabled"}>−</button><output>${mine}</output><button type="button" data-a="inc" data-i="${it.id}" aria-label="Eén meer"${left>0?"":" disabled"}>+</button></div></div>`;
+    }
+    const on=!it.out.includes(cur),n=S.people.filter(pp=>!it.out.includes(pp.id)).length;
+    return `<div class="pline${on?" has":""}"><div class="pn">${esc(it.n||"?")}<div class="pm">${eur(p)} · ${n?`${n} delen, ${eur(p/n)} elk`:"niemand deelt mee"}</div></div>
+      <button type="button" class="switch" role="switch" data-a="tog" data-i="${it.id}" aria-checked="${on}">Deelt mee<i></i></button></div>`;
+  }).join("");
+  $("panel").setAttribute("aria-labelledby","tab-"+cur);
+  $("panel").innerHTML=`<div class="who"><span>${esc(me.name)}</span><b>${eur(t[cur])}</b></div>${rows}`;
+}
+$("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;cur=b.dataset.p;renderSplit()});
+$("panel").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-a]");if(!b)return;
+  const it=S.items.find(i=>i.id===b.dataset.i),a=b.dataset.a;
+  if(a==="inc"&&used(it)<qty(it))it.c[cur]=(it.c[cur]||0)+1;
+  if(a==="dec"&&(it.c[cur]||0)>0)it.c[cur]--;
+  if(a==="tog")it.out=it.out.includes(cur)?it.out.filter(x=>x!==cur):[...it.out,cur];
+  save();renderSplit();renderResult();
+  const again=$("panel").querySelector(`button[data-a="${a}"][data-i="${b.dataset.i}"]`);if(again&&!again.disabled)again.focus({preventScroll:true});
+});
+
+/* ---------- overzicht ---------- */
+function renderResult(){
+  const {t,parts,open,total}=compute();
+  const assigned=total-open;
+  let html=S.people.map(p=>`<div class="rrow"><div>${esc(p.name)}<small>${esc(parts[p.id].join(", ")||"niets")}</small></div><b>${eur(t[p.id])}</b></div>`).join("");
+  if(open>0.004)html+=`<div class="rrow open"><div>Nog niet toegewezen<small>wordt niet verdeeld</small></div><b>${eur(open)}</b></div>`;
+  html+=`<div class="rrow"><div>Totaal rekening</div><b>${eur(total)}</b></div>`;
+  $("result").innerHTML=S.people.length||S.items.length?html:`<p class="empty">Hier verschijnt wat iedereen betaalt.</p>`;
+  const done=open<=0.004&&S.items.length>0;
+  $("fLbl").textContent=done?"Alles toegewezen":"Nog toe te wijzen";
+  $("fVal").textContent=done?eur(total):`${eur(open)} van ${eur(total)}`;
+  $("fVal").className=done?"ok":(open>0.004?"warn":"");
+}
+function overviewText(){
+  const {t,open,total}=compute();
+  let s=`Rekening ${eur(total)}\n`+S.people.map(p=>`${p.name}: ${eur(t[p.id])}`).join("\n");
+  if(open>0.004)s+=`\nNog niet toegewezen: ${eur(open)}`;
+  return s;
+}
+$("shareBtn").onclick=async e=>{
+  const txt=overviewText(),b=e.currentTarget;
+  try{
+    if(navigator.share){await navigator.share({title:"SplitBill",text:txt});return}
+    await navigator.clipboard.writeText(txt);b.textContent="Gekopieerd";
+  }catch(err){if(err&&err.name==="AbortError")return;b.textContent="Delen lukt niet"}
+  setTimeout(()=>b.textContent="Deel overzicht",1800);
+};
+let armed=false;
+$("resetBtn").onclick=e=>{
+  const b=e.currentTarget;
+  if(!armed){armed=true;b.textContent="Zeker? Tik nog eens";setTimeout(()=>{armed=false;b.textContent="Nieuwe rekening"},2500);return}
+  armed=false;b.textContent="Nieuwe rekening";
+  S.items=[];S.billTotal=null;img=null;rot=0;$("photoBox").hidden=true;
+  save();renderLines();renderSplit();renderResult();
+};
+
+/* ---------- foto + tekstherkenning ---------- */
+let img=null,rot=0;
+function photoNote(t,cls){const m=$("photoMsg");m.hidden=!t;m.textContent=t||"";m.className="status"+(cls?" "+cls:"")}
+function loadSrc(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error("img"));im.src=src})}
+async function decodePhoto(f){
+  if(window.createImageBitmap){try{return await createImageBitmap(f,{imageOrientation:"from-image"})}catch(e){}}
+  try{return await loadSrc(URL.createObjectURL(f))}catch(e){}
+  const data=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error("read"));r.readAsDataURL(f)});
+  return await loadSrc(data);
+}
+$("photoInput").addEventListener("change",async e=>{
+  const input=e.target,f=input.files&&input.files[0];if(!f)return;
+  photoNote("Foto laden…");
+  try{
+    const im=await decodePhoto(f);
+    const w=im.naturalWidth||im.width,h=im.naturalHeight||im.height;
+    if(!w||!h)throw new Error("empty");
+    img=im;rot=w>h?90:0;
+    $("photoBox").hidden=false;drawTo($("preview"),1100,false);
+    photoNote("");setStatus("Draai de foto tot de tekst rechtop staat en tik op Lees rekening.");
+    $("photoBox").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(err){
+    photoNote(/hei[cf]/i.test((f.type||"")+(f.name||""))
+      ?"Deze HEIC-foto kan je browser niet openen. Neem de foto rechtstreeks met de camera of kies een screenshot of JPG."
+      :"Deze foto kan niet geopend worden. Probeer een andere of neem een nieuwe foto.","warn");
+  }finally{input.value=""}
+});
+function drawTo(cv,maxSide,enhance,r0){
+  const R=r0==null?rot:r0;
+  const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,s=Math.min(1,maxSide/Math.max(w,h));
+  const sw=Math.round(w*s),sh=Math.round(h*s),swap=R%180!==0;
+  cv.width=swap?sh:sw;cv.height=swap?sw:sh;
+  const ctx=cv.getContext("2d");
+  ctx.save();ctx.translate(cv.width/2,cv.height/2);ctx.rotate(R*Math.PI/180);ctx.drawImage(img,-sw/2,-sh/2,sw,sh);ctx.restore();
+  if(enhance){
+    const d=ctx.getImageData(0,0,cv.width,cv.height),px=d.data,hist=new Uint32Array(256);
+    for(let i=0;i<px.length;i+=4){const l=(px[i]*299+px[i+1]*587+px[i+2]*114)/1000|0;px[i]=l;hist[l]++}
+    const n=px.length/4;let lo=0,hi=255,acc=0;
+    for(let v=0;v<256;v++){acc+=hist[v];if(acc>n*0.02){lo=v;break}}
+    acc=0;for(let v=255;v>=0;v--){acc+=hist[v];if(acc>n*0.02){hi=v;break}}
+    const r=Math.max(1,hi-lo);
+    for(let i=0;i<px.length;i+=4){let v=(px[i]-lo)*255/r;v=v<0?0:v>255?255:v;px[i]=px[i+1]=px[i+2]=v}
+    ctx.putImageData(d,0,0);
+  }
+}
+$("rotL").onclick=()=>{rot=(rot+270)%360;drawTo($("preview"),1100,false)};
+$("rotR").onclick=()=>{rot=(rot+90)%360;drawTo($("preview"),1100,false)};
+function setStatus(t,cls){const s=$("ocrStatus");s.textContent=t;s.className="status"+(cls?" "+cls:"")}
+function progress(v){$("prog").hidden=v==null;$("progBar").style.width=((v||0)*100)+"%"}
+function loadTess(){
+  return window.Tesseract?Promise.resolve():new Promise((res,rej)=>{const s=document.createElement("script");s.src=TESS;s.onload=res;s.onerror=()=>rej(new Error("load"));document.head.appendChild(s)});
+}
+const withTimeout=(p,ms,msg)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))]);
+$("ocrBtn").onclick=async()=>{
+  if(!img)return;const btn=$("ocrBtn");btn.disabled=true;progress(0);
+  setStatus("Tekstherkenning laden… (eerste keer even geduld)");
+  let worker,stage="script";
+  try{
+    await withTimeout(loadTess(),30000,"timeout");
+    stage="taal";setStatus("Taal laden…");
+    worker=await withTimeout(Tesseract.createWorker("nld",1,{logger:m=>{
+      if(m.status==="recognizing text")progress(m.progress);
+    }}),90000,"timeout");
+    await worker.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"});
+    stage="lezen";
+    /* probeer eerst de huidige stand, daarna de andere drie standen */
+    const order=[rot,(rot+270)%360,(rot+90)%360,(rot+180)%360];
+    let best=null;
+    for(let i=0;i<order.length;i++){
+      setStatus(i?`Niets gevonden, gedraaid proberen (${i}/3)…`:"Rekening lezen…");progress(0);
+      const cv=document.createElement("canvas");drawTo(cv,2400,true,order[i]);
+      const {data}=await worker.recognize(cv);
+      window.lastOcrText=data.text;const r=parseReceipt(data.text);
+      if(!best||r.items.length>best.items.length)best=Object.assign(r,{rot:order[i]});
+      if(r.items.length>=2)break;
+    }
+    if(!best.items.length){setStatus("Geen lijnen herkend. Neem een scherpere foto, recht van voren, of vul de lijnen zelf in.","warn");return}
+    if(best.rot!==rot){rot=best.rot;drawTo($("preview"),1100,false)}
+    S.items=best.items.map(x=>newItem(x.n,x.q,x.p));S.billTotal=best.total;
+    const sum=S.items.reduce((a,i)=>a+num(i.p),0);
+    const diff=best.total?Math.round((best.total-sum)*100)/100:0;
+    if(diff>0.004)S.items.push(Object.assign(newItem("Niet herkend – pas aan",1,diff,"drank"),{auto:true}));
+    save();renderLines();renderSplit();renderResult();
+    const ok=best.total&&Math.abs(diff)<0.005;
+    setStatus(ok?`${best.items.length} lijnen gevonden, totaal klopt.`:
+      diff>0?`${best.items.length} lijnen gevonden. ${eur(diff)} kon niet gelezen worden: pas de lijn "Niet herkend" aan.`:
+      `${best.items.length} lijnen gevonden. Controleer de lijnen hieronder.`,ok?"ok":"warn");
+  }catch(err){
+    const m=String(err&&err.message||err||"");
+    setStatus(stage==="script"?"De tekstherkenning kon niet laden. Controleer je internet, en open de pagina via je GitHub Pages-link in Safari of Chrome (niet in een voorbeeldweergave).":
+      stage==="taal"?"De taalgegevens konden niet laden"+(m==="timeout"?" (duurde te lang)":"")+". Open de pagina via je GitHub Pages-link in Safari of Chrome en probeer opnieuw.":
+      "Lezen mislukt ("+m.slice(0,80)+"). Probeer opnieuw of vul de lijnen zelf in.","warn");
+  }finally{
+    if(worker)worker.terminate().catch(()=>{});
+    btn.disabled=false;progress(null);
+  }
+};
+function cleanName(s){return s.replace(/^[^A-Za-zÀ-ÿ0-9]+|[^A-Za-zÀ-ÿ0-9)'’.]+$/g,"").replace(/\s{2,}/g," ").trim()}
+function parseReceipt(text){
+  const lines=text.split(/\r?\n/).map(l=>l.replace(/[|_—]/g," ").replace(/\s+/g," ").trim()).filter(Boolean);
+  const items=[],names=[],prices=[];let total=null,stop=false;
+  for(let l of lines){
+    l=l.replace(/^[lI|!](?=\s)/,"1").replace(/^O(?=\s)/,"0");
+    if(/^totaal\b/i.test(l)){const m=l.match(/(\d{1,4}[.,]\d{2})/);if(m&&total==null)total=num(m[1]);stop=true;continue}
+    if(stop){if(total==null){const m=l.match(/(?:totaal|kaart|betaald)\D*(\d{1,4}[.,]\d{2})/i);if(m)total=num(m[1])}continue}
+    if(/^(#|naam|prijs|btw|betaling)\b/i.test(l)||/%/.test(l))continue;
+    let m=l.match(/^(\d{1,2})\s*[xX×]?\s+(.*?[A-Za-zÀ-ÿ].*?)\s+€?\s*(\d{1,4}[.,]\d{2})\s*€?$/);
+    if(m){items.push({q:+m[1],n:cleanName(m[2]),p:num(m[3])});continue}
+    m=l.match(/^(\d{1,2})\s+([A-Za-zÀ-ÿ].*)$/);if(m){names.push({q:+m[1],n:cleanName(m[2])});continue}
+    m=l.match(/^€?\s*(\d{1,4}[.,]\d{2})$/);if(m)prices.push(num(m[1]));
+  }
+  if(!items.length&&names.length&&names.length===prices.length)names.forEach((x,i)=>items.push({...x,p:prices[i]}));
+  return {items,total};
+}
+
+renderPeople();renderLines();renderSplit();renderResult();
+
+/* Service worker: de app opent ook zonder internet (de tekstherkenning heeft wel internet nodig) */
+if("serviceWorker" in navigator&&location.protocol==="https:"){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
