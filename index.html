@@ -142,7 +142,7 @@ button:focus-visible,label.btn:focus-within{outline:3px solid var(--accent-sterk
     <h2 id="h-names">Wie zit er aan tafel</h2>
     <div id="personForm" class="row2">
       <label for="personInput" class="vh">Naam</label>
-      <input id="personInput" placeholder="Naam (of: Luc, Nick, Jo)" enterkeyhint="done" autocomplete="off" autocapitalize="words">
+      <input id="personInput" placeholder="Naam (of: Luc Nick Jo)" enterkeyhint="done" autocomplete="off" autocapitalize="words">
       <button class="btn" id="addPerson" type="button">Voeg toe</button>
     </div>
     <div class="people" id="people"></div>
@@ -238,7 +238,7 @@ function renderPeople(){
   $("people").innerHTML=S.people.length?S.people.map(p=>`<span class="person">${esc(p.name)}<button type="button" data-del="${p.id}" aria-label="Verwijder ${esc(p.name)}">×</button></span>`).join(""):`<p class="empty">Nog niemand. Voeg de namen toe.</p>`;
 }
 function addPeople(){
-  const names=$("personInput").value.split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+  const names=$("personInput").value.split(/[\s,;]+/).map(s=>s.trim()).filter(Boolean);
   if(!names.length)return;
   names.forEach(n=>S.people.push({id:uid(),name:n}));
   $("personInput").value="";
